@@ -98,7 +98,8 @@
             }).catch(function(err){
                 console.error("Error parsing Current Weather data!",err, err.stack.toString());
             }),
-            // Get Weather condition (icon mapping and condition name/description -- since there's no reliable way to scrape this data from HKO's feed)
+            // Get Weather condition from openweathermap.org (icon mapping and condition name/description -- since there's no reliable way to scrape this data from HKO's feed)
+            // TODO: Parse HKO's homepage to get relevant weather condition instead of using openweathermap.org
             _getJsonFeed(openweatherJsonFeedUrl).then(function (openWeatherData) {
                 var condition;
                 if (! (openWeatherData && openWeatherData.weather && openWeatherData.weather instanceof Array && openWeatherData.weather.length > 0)) throw new Error("Failed to get weather data from openweathermap.org");
@@ -125,7 +126,7 @@
             }).catch(function(err){
                 console.error("Error parsing Weather Warning data!",err, err.stack.toString());
             }),
-            // Air Pollution index from
+            // Air Quality Health Index (AQHI) from the Environmental Protection Department (EPD)
             _getXmlFeed(airQualityFeedUrl).then(function ($) {
                 var aqDateMatch = aqDateRegex.exec($('item title').text()),
                     aqGeneralMatch = aqGeneralRegex.exec($('item description').text()),

@@ -1,6 +1,6 @@
 {
   "name": "hko-scraper",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Hong Kong Observatory and Air Quality data scraper",
   "main": "index.js",
   "scripts": {
@@ -20,6 +20,10 @@
     "bluebird": "~2.9.9"
   },
   "devDependencies": {
-      "chai": "latest"
+    "chai": "latest"
+  },
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/ronalddddd/hko-scraper"
   }
 }
