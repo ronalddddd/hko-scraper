@@ -78,8 +78,8 @@
             uvIntensityRegex = /Intensity of UV radiation : ([^\r|\n|$]*)/,
             warningRegex = /(.*) \((\d\d):(\d\d) HKT (\d\d)\/(\d\d)\/(\d\d\d\d)\)/,
             aqDateRegex = /HKSAR Air Quality Health Index at : (.* \+0800)/, // HKSAR Air Quality Health Index at : Sun, 15 Feb 2015 16:30:00 +0800 Current Condition
-            aqGeneralRegex = /General Stations: (\d*) to (\d*)/, // General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)
-            aqRoadRegex = /Roadside Stations: (\d*) to (\d*)/; // General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)
+            aqGeneralRegex = /General Stations: (\d*)( to (\d*))?/, // General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)
+            aqRoadRegex = /Roadside Stations: (\d*)( to (\d*))?/; // General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)
 
         return bluebird.all([
             // Current Weather from HKO
@@ -133,9 +133,9 @@
 
                 weather.air_quality.date = new Date(aqDateMatch[1]);
                 weather.air_quality.general.from = parseInt(aqGeneralMatch[1]) || undefined;
-                weather.air_quality.general.to = parseInt(aqGeneralMatch[2]) || undefined;
+                weather.air_quality.general.to = parseInt(aqGeneralMatch[3]) || undefined;
                 weather.air_quality.roadside.from = parseInt(aqRoadSideMatch[1]) || undefined;
-                weather.air_quality.roadside.to = parseInt(aqRoadSideMatch[2]) || undefined;
+                weather.air_quality.roadside.to = parseInt(aqRoadSideMatch[3]) || undefined;
             }).catch(function(err){
                 console.error("Error parsing Air Quality data!",err, err.stack.toString());
             })

@@ -20,6 +20,8 @@
                 expect(weather.degrees_c).to.exist;
                 expect(weather.degrees_c).to.be.a.number;
                 done();
+
+                console.log(weather);
             });
 
             // TODO: Check all other fields.
