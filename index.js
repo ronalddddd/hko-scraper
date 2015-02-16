@@ -6,7 +6,8 @@
         format = require('util').format,
         currentWeatherFeedUrl = "http://rss.weather.gov.hk/rss/CurrentWeather.xml",
         currentWarningFeedUrl = "http://rss.weather.gov.hk/rss/WeatherWarningSummaryv2.xml",
-        airQualityFeedUrl = "http://www.aqhi.gov.hk/epd/ddata/html/out/aqhirss_Eng.xml";
+        airQualityFeedUrl = "http://www.aqhi.gov.hk/epd/ddata/html/out/aqhirss_Eng.xml",
+        openweatherJsonFeedUrl = "http://api.openweathermap.org/data/2.5/weather?q=Hong+Kong&units=metric";
 
     /**
      * Loads the provided URL into cheerio.load() method
@@ -14,7 +15,7 @@
      * @returns {*} A promise that resolve to the cheerio.load() result object
      * @private
      */
-    var _getFeed = function (url) {
+    var _getXmlFeed = function (url) {
         return request(url).then(function (res) {
             var response = res[0],
                 body = res[1];
@@ -29,17 +30,35 @@
         });
     };
 
+    var _getJsonFeed = function (url) {
+        return request(url).then(function (res){
+            var response = res[0],
+                body = res[1];
+
+            if (response.statusCode !== 200) {
+                throw new Error(format("[%s] %s", response.statusCode, response.request.href));
+            }
+
+            return JSON.parse(body);
+        });
+    };
+
     var getWeather = function () {
         var weather = {
                 "scrape_date": new Date(),
-                "weather_type": undefined,
+                "weather_condition": { // http://openweathermap.org/weather-conditions
+                    "id": undefined,
+                    "name": undefined,
+                    "description": undefined,
+                    "icon": undefined
+                },
                 "degrees_c": undefined,
                 "humidity_pct": undefined,
                 "uv_index": undefined,
-                "uv_intensity": "",
+                "uv_intensity": undefined,
                 "weather_warning": {
                     "date": undefined,
-                    "text": ""
+                    "text": undefined
                 },
                 "air_quality": {
                     date: undefined,
@@ -47,7 +66,7 @@
                         from: undefined,
                         to: undefined
                     },
-                    roadSide: {
+                    roadside: {
                         from: undefined,
                         to: undefined
                     }
@@ -64,7 +83,7 @@
 
         return bluebird.all([
             // Current Weather from HKO
-            _getFeed(currentWeatherFeedUrl).then(function ($) {
+            _getXmlFeed(currentWeatherFeedUrl).then(function ($) {
                 var weatherStr = $('description p').text(),
                     degreesMatch = degreesRegex.exec(weatherStr),
                     humidityMatch = humidityRegex.exec(weatherStr),
@@ -79,8 +98,20 @@
             }).catch(function(err){
                 console.error("Error parsing Current Weather data!",err, err.stack.toString());
             }),
+            // Get Weather condition (icon mapping and condition name/description -- since there's no reliable way to scrape this data from HKO's feed)
+            _getJsonFeed(openweatherJsonFeedUrl).then(function (openWeatherData) {
+                var condition;
+                if (! (openWeatherData && openWeatherData.weather && openWeatherData.weather instanceof Array && openWeatherData.weather.length > 0)) throw new Error("Failed to get weather data from openweathermap.org");
+                condition = openWeatherData.weather.pop();
+                weather.weather_condition.id = condition.id;
+                weather.weather_condition.name = condition.main;
+                weather.weather_condition.description = condition.description;
+                weather.weather_condition.icon = condition.icon;
+            }).catch(function(err){
+                console.error("Error parsing openweathermap.org data!",err, err.stack.toString());
+            }),
             // Current Warning from HKO
-            _getFeed(currentWarningFeedUrl).then(function ($) {
+            _getXmlFeed(currentWarningFeedUrl).then(function ($) {
                 var warningMatch = warningRegex.exec($('item title').text());
                 weather.weather_warning.text = (warningMatch && warningMatch.length > 1)? warningMatch[1].trim() : null;
                 weather.weather_warning.date = (warningMatch && warningMatch.length >= 5)?
@@ -95,7 +126,7 @@
                 console.error("Error parsing Weather Warning data!",err, err.stack.toString());
             }),
             // Air Pollution index from
-            _getFeed(airQualityFeedUrl).then(function ($) {
+            _getXmlFeed(airQualityFeedUrl).then(function ($) {
                 var aqDateMatch = aqDateRegex.exec($('item title').text()),
                     aqGeneralMatch = aqGeneralRegex.exec($('item description').text()),
                     aqRoadSideMatch = aqRoadRegex.exec($('item description').text());
@@ -103,14 +134,14 @@
                 weather.air_quality.date = new Date(aqDateMatch[1]);
                 weather.air_quality.general.from = parseInt(aqGeneralMatch[1]) || undefined;
                 weather.air_quality.general.to = parseInt(aqGeneralMatch[2]) || undefined;
-                weather.air_quality.roadSide.from = parseInt(aqRoadSideMatch[1]) || undefined;
-                weather.air_quality.roadSide.to = parseInt(aqRoadSideMatch[2]) || undefined;
+                weather.air_quality.roadside.from = parseInt(aqRoadSideMatch[1]) || undefined;
+                weather.air_quality.roadside.to = parseInt(aqRoadSideMatch[2]) || undefined;
             }).catch(function(err){
                 console.error("Error parsing Air Quality data!",err, err.stack.toString());
             })
         ]).then(function () {
             // All done.
-            console.log(weather);
+            //console.log(weather);
             return weather;
         }).catch(function (err) {
             throw err;
@@ -119,5 +150,3 @@
 
     module.exports.getWeather = getWeather;
 }());
-
-module.exports.getWeather();

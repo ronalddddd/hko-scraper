@@ -18,5 +18,8 @@
     "cheerio": "~0.18.0",
     "request": "~2.53.0",
     "bluebird": "~2.9.9"
+  },
+  "devDependencies": {
+      "chai": "latest"
   }
 }
