@@ -7,7 +7,37 @@
         currentWeatherFeedUrl = "http://rss.weather.gov.hk/rss/CurrentWeather.xml",
         currentWarningFeedUrl = "http://rss.weather.gov.hk/rss/WeatherWarningSummaryv2.xml",
         airQualityFeedUrl = "http://www.aqhi.gov.hk/epd/ddata/html/out/aqhirss_Eng.xml",
-        openweatherJsonFeedUrl = "http://api.openweathermap.org/data/2.5/weather?q=Hong+Kong&units=metric";
+        weatherConditionsMap = { // Legend: http://www.weather.gov.hk/textonly/explain/wxicon_e.htm
+            "50": { caption: "Sunny" },
+            "51": { caption: "Sunny Periods" },
+            "52": { caption: "Sunny Intervals" },
+            "53": { caption: "Sunny Periods with A Few Showers" },
+            "54": { caption: "Sunny Intervals with Showers" },
+            "60": { caption: "Cloudy" },
+            "61": { caption: "Overcast" },
+            "62": { caption: "Light Rain" },
+            "63": { caption: "Rain" },
+            "64": { caption: "Heavy Rain" },
+            "65": { caption: "Thunderstorms" },
+            "70": { caption: "Fine" },
+            "71": { caption: "Fine" },
+            "72": { caption: "Fine" },
+            "73": { caption: "Fine" },
+            "74": { caption: "Fine" },
+            "75": { caption: "Fine" },
+            "76": { caption: "Mainly Cloudy" },
+            "77": { caption: "Mainly Fine" },
+            "80": { caption: "Windy" },
+            "81": { caption: "Dry" },
+            "82": { caption: "Humid" },
+            "83": { caption: "Fog" },
+            "84": { caption: "Mist" },
+            "85": { caption: "Haze" },
+            "90": { caption: "Hot" },
+            "91": { caption: "Warm" },
+            "92": { caption: "Cool" },
+            "93": { caption: "Cold" }
+        };
 
     /**
      * Loads the provided URL into cheerio.load() method
@@ -30,35 +60,22 @@
         });
     };
 
-    var _getJsonFeed = function (url) {
-        return request(url).then(function (res){
-            var response = res[0],
-                body = res[1];
-
-            if (response.statusCode !== 200) {
-                throw new Error(format("[%s] %s", response.statusCode, response.request.href));
-            }
-
-            return JSON.parse(body);
-        });
-    };
-
     var getWeather = function () {
         var weather = {
                 "scrape_date": new Date(),
-                "weather_condition": { // http://openweathermap.org/weather-conditions
-                    "id": undefined,
-                    "name": undefined,
-                    "description": undefined,
-                    "icon": undefined
-                },
                 "degrees_c": undefined,
                 "humidity_pct": undefined,
                 "uv_index": undefined,
                 "uv_intensity": undefined,
-                "weather_warning": {
+                "weather_condition": { // Legend: http://www.weather.gov.hk/textonly/explain/wxicon_e.htm
+                    "number": undefined,
+                    "caption": undefined,
+                    "icon_url": undefined
+                },
+                "weather_warning": { // Legend: http://www.hko.gov.hk/textonly/v2/explain/intro.htm
                     "date": undefined,
-                    "text": undefined
+                    "text": undefined,
+                    "icon_url": undefined
                 },
                 "air_quality": {
                     date: undefined,
@@ -77,43 +94,39 @@
             uvIndexRegex = /UV Index [^\d]*([^\r|\n]*)/,
             uvIntensityRegex = /Intensity of UV radiation : ([^\r|\n|$]*)/,
             warningRegex = /(.*) \((\d\d):(\d\d) HKT (\d\d)\/(\d\d)\/(\d\d\d\d)\)/,
-            aqDateRegex = /HKSAR Air Quality Health Index at : (.* \+0800)/, // HKSAR Air Quality Health Index at : Sun, 15 Feb 2015 16:30:00 +0800 Current Condition
-            aqGeneralRegex = /General Stations: (\d*)( to (\d*))?/, // General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)
-            aqRoadRegex = /Roadside Stations: (\d*)( to (\d*))?/; // General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)
+            aqDateRegex = /HKSAR Air Quality Health Index at : (.* \+0800)/,// e.g. "HKSAR Air Quality Health Index at : Sun, 15 Feb 2015 16:30:00 +0800 Current Condition"
+            aqGeneralRegex = /General Stations: (\d*)( to (\d*))?/, // "General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)"
+            aqRoadRegex = /Roadside Stations: (\d*)( to (\d*))?/, // "General Stations: 4 to 7 (Health Risk: Moderate to High)</p><p>Roadside Stations: 6 to 10 (Health Risk: Moderate to Very High)"
+            conditionRegex = /[^\/]+(\d\d)\..*$/; // "http://www.weather.gov.hk/images/wxicon/pic77.png"
 
         return bluebird.all([
             // Current Weather from HKO
             _getXmlFeed(currentWeatherFeedUrl).then(function ($) {
                 var weatherStr = $('description p').text(),
+                    iconSrc = $('description img').first().attr("src"),
                     degreesMatch = degreesRegex.exec(weatherStr),
                     humidityMatch = humidityRegex.exec(weatherStr),
                     uvIndexMatch = uvIndexRegex.exec(weatherStr),
-                    uvIntensityMatch = uvIntensityRegex.exec(weatherStr);
+                    uvIntensityMatch = uvIntensityRegex.exec(weatherStr),
+                    conditionMatch = conditionRegex.exec(iconSrc);
 
                 //console.log(degreesMatch);
                 weather.degrees_c = (degreesMatch && degreesMatch.length > 1)? parseInt(degreesMatch[1]) : null;
                 weather.humidity_pct = (humidityMatch && humidityMatch.length > 1)? parseInt(humidityMatch[1]) : null;
                 weather.uv_index = (uvIndexMatch && uvIndexMatch.length > 1)? parseFloat(uvIndexMatch[1]) : null;
                 weather.uv_intensity = (uvIntensityMatch && uvIntensityMatch.length > 1)? uvIntensityMatch[1].trim() : null;
+                if ((conditionMatch && conditionMatch.length > 1)){
+                    weather.weather_condition.number = parseInt(conditionMatch[1]);
+                    weather.weather_condition.caption = (weatherConditionsMap[conditionMatch[1]])? weatherConditionsMap[conditionMatch[1]].caption : null;
+                    weather.weather_condition.icon_url = iconSrc || null;
+                }
             }).catch(function(err){
                 console.error("Error parsing Current Weather data!",err, err.stack.toString());
             }),
-            // Get Weather condition from openweathermap.org (icon mapping and condition name/description -- since there's no reliable way to scrape this data from HKO's feed)
-            // TODO: Parse HKO's homepage to get relevant weather condition instead of using openweathermap.org
-            _getJsonFeed(openweatherJsonFeedUrl).then(function (openWeatherData) {
-                var condition;
-                if (! (openWeatherData && openWeatherData.weather && openWeatherData.weather instanceof Array && openWeatherData.weather.length > 0)) throw new Error("Failed to get weather data from openweathermap.org");
-                condition = openWeatherData.weather.pop();
-                weather.weather_condition.id = condition.id;
-                weather.weather_condition.name = condition.main;
-                weather.weather_condition.description = condition.description;
-                weather.weather_condition.icon = condition.icon;
-            }).catch(function(err){
-                console.error("Error parsing openweathermap.org data!",err, err.stack.toString());
-            }),
             // Current Warning from HKO
             _getXmlFeed(currentWarningFeedUrl).then(function ($) {
-                var warningMatch = warningRegex.exec($('item title').text());
+                var warningMatch = warningRegex.exec($('item title').text()),
+                    iconSrc = $('description img').first().attr("src");
                 weather.weather_warning.text = (warningMatch && warningMatch.length > 1)? warningMatch[1].trim() : null;
                 weather.weather_warning.date = (warningMatch && warningMatch.length >= 5)?
                     new Date(
@@ -123,6 +136,7 @@
                         parseInt(warningMatch[2]), // hour
                         parseInt(warningMatch[3])) // minute
                     : null;
+                weather.weather_warning.icon_url = iconSrc;
             }).catch(function(err){
                 console.error("Error parsing Weather Warning data!",err, err.stack.toString());
             }),

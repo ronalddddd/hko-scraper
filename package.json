@@ -1,6 +1,6 @@
 {
   "name": "hko-scraper",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Hong Kong Observatory and Air Quality data scraper",
   "main": "index.js",
   "scripts": {
